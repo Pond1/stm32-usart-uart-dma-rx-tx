@@ -23,7 +23,7 @@ void usart_send_string(const char* str);
  * \note            Contains raw data that are about to be processed by different events
  */
 uint8_t
-usart_rx_dma_buffer[64];
+usart_rx_dma_buffer[33];
 
 /**
  * \brief           Application entry point
@@ -83,10 +83,12 @@ void
 usart_rx_check(void) {
     static size_t old_pos;
     size_t pos;
+    size_t num;
 
+    num = LL_DMA_GetDataLength(DMA1, LL_DMA_STREAM_1); //
     /* Calculate current position in buffer and check for new data available */
-    pos = ARRAY_LEN(usart_rx_dma_buffer) - LL_DMA_GetDataLength(DMA1, LL_DMA_STREAM_1);
-    if (pos != old_pos) {                       /* Check change in received data */
+    pos = ARRAY_LEN(usart_rx_dma_buffer) - num;
+        if (pos != old_pos) {                       /* Check change in received data */
         if (pos > old_pos) {                    /* Current position is over previous one */
             /*
              * Processing is done in "linear" mode.
@@ -174,7 +176,7 @@ usart_init(void) {
 
     /* Peripheral clock enable */
     LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_USART3);
-    LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOD);
+    LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOB);
     LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_DMA1);
 
     /*
@@ -183,13 +185,13 @@ usart_init(void) {
      * PD8   ------> USART3_TX
      * PD9   ------> USART3_RX
      */
-    GPIO_InitStruct.Pin = LL_GPIO_PIN_8 | LL_GPIO_PIN_9;
+    GPIO_InitStruct.Pin = LL_GPIO_PIN_10 | LL_GPIO_PIN_11;
     GPIO_InitStruct.Mode = LL_GPIO_MODE_ALTERNATE;
     GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_VERY_HIGH;
     GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
     GPIO_InitStruct.Pull = LL_GPIO_PULL_UP;
     GPIO_InitStruct.Alternate = LL_GPIO_AF_7;
-    LL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+    LL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
     /* USART3 DMA Init */
     LL_DMA_SetChannelSelection(DMA1, LL_DMA_STREAM_1, LL_DMA_CHANNEL_4);
@@ -276,38 +278,76 @@ USART3_IRQHandler(void) {
 /**
  * \brief           System Clock Configuration
  */
-void
-SystemClock_Config(void) {
+void SystemClock_Config(void) {
     /* Configure flash latency */
-    LL_FLASH_SetLatency(LL_FLASH_LATENCY_3);
-    if (LL_FLASH_GetLatency() != LL_FLASH_LATENCY_3) {
-        while (1) {}
-    }
+    LL_FLASH_SetLatency(LL_FLASH_LATENCY_5);
+    while(LL_FLASH_GetLatency()!= LL_FLASH_LATENCY_5) {}
 
     /* Configure voltage scaling */
     LL_PWR_SetRegulVoltageScaling(LL_PWR_REGU_VOLTAGE_SCALE1);
-
-    /* Configure HSI */
-    LL_RCC_HSI_SetCalibTrimming(16);
-    LL_RCC_HSI_Enable();
-    while (LL_RCC_HSI_IsReady() != 1) {}
-
+    LL_RCC_HSE_Enable();
+    
+    /* Wait till HSE is ready */
+    while(LL_RCC_HSE_IsReady() != 1) {}
     /* Configure PLL */
-    LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSI, LL_RCC_PLLM_DIV_8, 100, LL_RCC_PLLP_DIV_2);
+    LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSE, LL_RCC_PLLM_DIV_4, 168, LL_RCC_PLLP_DIV_2);
     LL_RCC_PLL_Enable();
+    
     while (LL_RCC_PLL_IsReady() != 1) {}
 
     /* Configure system prescalers */
     LL_RCC_SetAHBPrescaler(LL_RCC_SYSCLK_DIV_1);
-    LL_RCC_SetAPB1Prescaler(LL_RCC_APB1_DIV_2);
-    LL_RCC_SetAPB2Prescaler(LL_RCC_APB2_DIV_1);
+    LL_RCC_SetAPB1Prescaler(LL_RCC_APB1_DIV_4);
+    LL_RCC_SetAPB2Prescaler(LL_RCC_APB2_DIV_2);
     LL_RCC_SetSysClkSource(LL_RCC_SYS_CLKSOURCE_PLL);
+     
+     /* Wait till System clock is ready */
     while (LL_RCC_GetSysClkSource() != LL_RCC_SYS_CLKSOURCE_STATUS_PLL) {}
 
     /* Configure systick */
-    LL_Init1msTick(100000000);
+    LL_Init1msTick(168000000);
+    LL_SetSystemCoreClock(168000000);
+        
     LL_SYSTICK_SetClkSource(LL_SYSTICK_CLKSOURCE_HCLK);
     LL_SYSTICK_EnableIT();
-    LL_SetSystemCoreClock(100000000);
-    LL_RCC_SetTIMPrescaler(LL_RCC_TIM_PRESCALER_TWICE);
+    
+    //LL_RCC_SetTIMPrescaler(LL_RCC_TIM_PRESCALER_TWICE);
 }
+
+//void SystemClock_Config(void)
+//{
+//  LL_FLASH_SetLatency(LL_FLASH_LATENCY_5);
+//  while(LL_FLASH_GetLatency()!= LL_FLASH_LATENCY_5)
+//  {
+//  }
+//  LL_PWR_SetRegulVoltageScaling(LL_PWR_REGU_VOLTAGE_SCALE1);
+//  LL_RCC_HSE_Enable();
+
+//   /* Wait till HSE is ready */
+//  while(LL_RCC_HSE_IsReady() != 1)
+//  {
+
+//  }
+//  LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSE, LL_RCC_PLLM_DIV_4, 168, LL_RCC_PLLP_DIV_2);
+//  LL_RCC_PLL_Enable();
+
+//   /* Wait till PLL is ready */
+//  while(LL_RCC_PLL_IsReady() != 1)
+//  {
+
+//  }
+//  LL_RCC_SetAHBPrescaler(LL_RCC_SYSCLK_DIV_1);
+//  LL_RCC_SetAPB1Prescaler(LL_RCC_APB1_DIV_4);
+//  LL_RCC_SetAPB2Prescaler(LL_RCC_APB2_DIV_2);
+//  LL_RCC_SetSysClkSource(LL_RCC_SYS_CLKSOURCE_PLL);
+
+//   /* Wait till System clock is ready */
+//  while(LL_RCC_GetSysClkSource() != LL_RCC_SYS_CLKSOURCE_STATUS_PLL)
+//  {
+
+//  }
+//  LL_Init1msTick(168000000);
+//  LL_SetSystemCoreClock(168000000);
+//}
+
+

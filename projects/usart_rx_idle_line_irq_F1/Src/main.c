@@ -23,7 +23,7 @@ void usart_send_string(const char* str);
  * \brief           USART RX buffer for DMA to transfer every received byte
  * \note            Contains raw data that are about to be processed by different events
  */
-uint8_t
+volatile uint8_t
 usart_rx_dma_buffer[64];
 
 /**
@@ -105,9 +105,9 @@ usart_rx_check(void) {
     size_t pos;
 
     /* Calculate current position in buffer and check for new data available */
-    pos = ARRAY_LEN(usart_rx_dma_buffer) - LL_DMA_GetDataLength(DMA1, LL_DMA_CHANNEL_5);
-    if (pos != old_pos) {                       /* Check change in received data */
-        if (pos > old_pos) {                    /* Current position is over previous one */
+    pos = ARRAY_LEN(usart_rx_dma_buffer) - LL_DMA_GetDataLength(DMA1, LL_DMA_CHANNEL_5); //DMA TC中断时NDTR的值恢复为usart_rx_dma_buffer大小，于是pos=0，
+    if (pos != old_pos) {                       /* Check change in received data */      //但不管DMA TC中断时NDTR的值是0，还是恢复为usart_rx_dma_buffer大小，usart_rx_check函数的处理都没问题。
+        if (pos > old_pos) {                    /* Current position is over previous one */ //DMA循环模式在TC中断时的NDTR值原则上是不会为0的，肯定是恢复为原设置的buffer大小。
             /*
              * Processing is done in "linear" mode.
              *
@@ -143,7 +143,7 @@ usart_rx_check(void) {
              * [ N - 1 ]            |---------------------------------|
              */
             usart_process_data(&usart_rx_dma_buffer[old_pos], ARRAY_LEN(usart_rx_dma_buffer) - old_pos);
-            if (pos > 0) {
+            if (pos > 0) { //在开启DMA TC中断的情况下，这里的pos > 0永远不会成立，但为了保持代码的通用性，不依赖于硬件设置，pos > 0的代码处理还是要有的。
                 usart_process_data(&usart_rx_dma_buffer[0], pos);
             }
         }
